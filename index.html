@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>House League</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#a3402c">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="House League">
+<style>
+:root{
+  --bg:#faf9f6; --card:#ffffff; --border:#e4e1d8; --text:#1f1d18; --text2:#6b6858; --muted:#9a9688;
+  --accent:#a3402c; --accent-bg:#f6e6e0; --accent-text:#7a2c1c;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#17140f; --card:#221e17; --border:#3a352b; --text:#f2efe6; --text2:#b5b1a2; --muted:#7d786a;
+    --accent-bg:#3a2018;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#17140f; --card:#221e17; --border:#3a352b; --text:#f2efe6; --text2:#b5b1a2; --muted:#7d786a;
+  --accent-bg:#3a2018;
+}
+*{box-sizing:border-box;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+.wrap{max-width:480px;margin:0 auto;padding:16px;}
+h1{font-size:18px;font-weight:600;margin:4px 0 2px;}
+.sub{font-size:12px;color:var(--text2);margin:0 0 16px;}
+.tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:4px;margin-bottom:16px;}
+.tab{flex:1;text-align:center;padding:9px 0;font-size:13px;font-weight:500;border-radius:9px;color:var(--text2);cursor:pointer;user-select:none;}
+.tab.active{background:var(--accent);color:#fff;}
+.panel{display:none;}
+.panel.active{display:block;}
+.statrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 14px;flex:1;}
+.stat + .stat{margin-left:8px;}
+.stat .l{font-size:11px;color:var(--text2);margin:0;}
+.stat .v{font-size:17px;font-weight:600;margin:2px 0 0;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-bg);color:var(--accent-text);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;}
+.name{font-size:14px;font-weight:500;margin:0;}
+.meta{font-size:12px;color:var(--text2);margin:1px 0 0;}
+.grow{flex:1;min-width:0;}
+button{font-family:inherit;font-size:13px;border-radius:9px;border:1px solid var(--border);background:var(--card);color:var(--text);padding:7px 12px;cursor:pointer;}
+button:active{transform:scale(0.97);}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;width:100%;padding:12px;font-size:14px;font-weight:600;margin-top:6px;}
+.btn-primary:disabled{opacity:0.5;}
+.icon-toggle{cursor:pointer;font-size:16px;line-height:1;}
+.icon-toggle.on{opacity:1;}
+.icon-toggle.off{opacity:0.25;}
+.evicted{opacity:0.45;}
+.sectionlabel{font-size:12px;font-weight:600;color:var(--text2);margin:14px 0 6px;text-transform:uppercase;letter-spacing:0.03em;}
+.lbrow{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);}
+.lbrow:last-child{border-bottom:none;}
+.rank{font-size:13px;font-weight:600;width:22px;color:var(--text2);}
+.you{background:var(--accent-bg);border-radius:10px;}
+.you .rank, .you .name{color:var(--accent-text);}
+.note{font-size:12px;color:var(--text2);text-align:center;margin-top:10px;}
+.picked{border-color:var(--accent);}
+.inp{height:38px;width:100%;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 10px;font-size:13px;}
+.tab{font-size:12px;}
+.rc{flex-direction:column;align-items:stretch;gap:4px;}
+#deadlineBanner{background:var(--accent-bg);color:var(--accent-text);border-radius:10px;padding:8px 12px;font-size:12px;font-weight:500;margin-bottom:12px;}
+.profile-btn{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-weight:600;font-size:12px;padding:0;flex-shrink:0;}
+#profileModal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:50;}
+#profileModal .sheet{background:var(--bg);width:100%;max-width:480px;border-radius:16px 16px 0 0;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));max-height:85vh;overflow:auto;}
+</style>
+</head>
+<body>
+<div class="wrap" id="authGate">
+  <h1>House League</h1>
+  <p class="sub">Unofficial fantasy league &middot; not affiliated with Banijay, Asianet or JioHotstar</p>
+  <div class="card" style="flex-direction:column;align-items:stretch;gap:8px;margin-top:20px;">
+    <p class="name" id="authTitle">Log in</p>
+    <input id="authEmail" type="email" placeholder="Email" style="height:40px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 10px;font-size:14px;">
+    <input id="authPassword" type="password" placeholder="Password (min 6 characters)" style="height:40px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 10px;font-size:14px;">
+    <button class="btn-primary" id="authSubmitBtn">Log in</button>
+    <p class="note" id="authError" style="color:var(--accent);"></p>
+    <p class="sub" style="text-align:center;margin-top:4px;">
+      <span id="authToggleText">New here?</span>
+      <a href="#" id="authToggleLink" style="color:var(--accent);text-decoration:none;font-weight:600;">Sign up</a>
+    </p>
+  </div>
+</div>
+
+<div class="wrap" id="mainApp" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+      <h1>House League</h1>
+      <p class="sub">Unofficial fantasy league &middot; not affiliated with Banijay, Asianet or JioHotstar</p>
+    </div>
+    <button class="profile-btn" id="profileBtn" title="Profile">?</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="draft">Draft</div>
+    <div class="tab" data-tab="team">My team</div>
+    <div class="tab" data-tab="board">Leaderboard</div>
+    <div class="tab" data-tab="rules">Rules</div>
+    <div class="tab" data-tab="admin" id="adminTabBtn" style="display:none;">Admin</div>
+  </div>
+
+  <div class="panel active" id="panel-draft">
+    <div id="deadlineBanner">Loading deadline…</div>
+    <div class="statrow">
+      <div class="stat"><p class="l">Credits left</p><p class="v" id="creditsLeft">100.0</p></div>
+      <div class="stat"><p class="l">Squad</p><p class="v"><span id="squadCount">0</span>/<span id="squadMax">15</span></p></div>
+    </div>
+    <p class="sub" style="margin:-4px 0 10px;">Pick your full squad here. Choose your starting line-up and captain in My team.</p>
+    <div id="contestantList"></div>
+    <button class="btn-primary" id="confirmBtn">Confirm squad</button>
+    <p class="note" id="confirmHint"></p>
+    <button id="resetBtn" style="width:100%;margin-top:8px;">Reset squad</button>
+  </div>
+
+  <div class="panel" id="panel-team">
+    <div id="myTeamView"></div>
+  </div>
+
+  <div class="panel" id="panel-board">
+    <div class="tabs" style="margin-bottom:12px;">
+      <div class="tab active" data-subtab="global">Global</div>
+      <div class="tab" data-subtab="leagues">My leagues</div>
+    </div>
+    <div id="leaderboardView"></div>
+    <div id="leaguesView" style="display:none;"></div>
+  </div>
+
+  <div class="panel" id="panel-rules">
+    <div class="card rc"><p class="name">How to play</p><p class="meta">Pick housemates within your 100 credits (bigger names cost more), confirm your squad, then choose your starting players and a captain in My team. After each episode your players earn or lose points for what happens in the house.</p></div>
+    <div class="card rc"><p class="name">Squad, starters and bench</p><p class="meta">You pick up to 15 housemates. 11 start and score points; the rest sit on the bench and score nothing. Nothing swaps automatically, you decide. As housemates get evicted your squad shrinks to match: the bench goes first, then the starters, down to a minimum of 5.</p></div>
+    <div class="card rc"><p class="name">Captain</p><p class="meta">Your captain must be one of your starters. Their points count double.</p></div>
+    <div class="card rc"><p class="name">Points</p><p class="meta">Survives the week +5<br>Wins a task +10<br>House captain +15<br>Housemate of the week +20<br>Warning from Bigg Boss &minus;5<br>Rule violation &minus;10<br>Evicted &minus;20</p></div>
+    <div class="card rc"><p class="name">Evictions</p><p class="meta">If one of your housemates is evicted they leave your squad. Tap Edit squad on the Draft tab to pick a replacement.</p></div>
+    <div class="card rc"><p class="name">Deadline</p><p class="meta">Each gameweek has a deadline shown at the top of the Draft tab. After it passes, your team is locked until the next one.</p></div>
+    <div class="card rc"><p class="name">Fair play</p><p class="meta">Free to play, no money or prizes. An unofficial fan game, not affiliated with Banijay, Asianet or JioHotstar. Points are added by hand after each episode, so they can take a little while to show up.</p></div>
+  </div>
+
+  <div class="panel" id="panel-admin">
+    <div id="adminGate">
+      <p class="sub">Enter admin PIN to update contestant status and weekly points.</p>
+      <input id="adminPin" type="password" placeholder="PIN" style="height:36px;width:100%;border-radius:9px;border:1px solid var(--border);background:var(--card);color:var(--text);padding:0 10px;font-size:13px;margin-bottom:8px;">
+      <button class="btn-primary" id="adminUnlockBtn">Unlock</button>
+      <p class="note" id="adminGateHint"></p>
+    </div>
+    <div id="adminView" style="display:none;"></div>
+  </div>
+
+  <p class="note">Points update weekly after episodes air</p>
+</div>
+
+<div id="profileModal"><div class="sheet">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><p class="name" style="font-size:16px;">Profile</p><button id="profileClose">Close</button></div>
+  <p class="meta" id="profileEmail"></p>
+  <p class="sectionlabel">Display name</p>
+  <div style="display:flex;gap:8px;"><input class="inp" id="profileName" type="text"><button id="saveNameBtn">Save</button></div>
+  <p class="sectionlabel">Change password</p>
+  <input class="inp" id="curPw" type="password" placeholder="Current password" style="margin-bottom:8px;">
+  <input class="inp" id="newPw" type="password" placeholder="New password (6+ characters)" style="margin-bottom:8px;">
+  <button class="btn-primary" id="changePwBtn" style="margin-top:0;">Change password</button>
+  <p class="note" id="profileMsg"></p>
+  <button id="logoutBtn" style="width:100%;margin-top:12px;">Log out</button>
+</div></div>
+<script type="module">
+// ============ FIREBASE SETUP ============
+// Paste your own project's config here (Firebase console > Project settings > Your apps)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAAYy3PopNVRzIl66FwiwhhPmJ23ySVtSQ",
+  authDomain: "house-league.firebaseapp.com",
+  projectId: "house-league",
+  storageBucket: "house-league.firebasestorage.app",
+  messagingSenderId: "154091269214",
+  appId: "1:154091269214:web:65cd71a8a9cf36d5db58cf"
+};
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import {
+  getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  onAuthStateChanged, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, onSnapshot, collection,
+  query, where, updateDoc, arrayUnion
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const fbApp = initializeApp(FIREBASE_CONFIG);
+const auth = getAuth(fbApp);
+const db = getFirestore(fbApp);
+let uid = null;
+
+// ============ GAME DATA ============
+const CONTESTANTS = [
+  {id:"gayathri_suresh", name:"Gayathri Suresh", price:9.5, status:"active", seedPoints:-10},
+  {id:"eldho_george", name:"Eldho George", price:9.0, status:"active", seedPoints:30},
+  {id:"jaseela_parveen", name:"Jaseela Parveen", price:8.5, status:"active", seedPoints:30},
+  {id:"rahul_easwar", name:"Rahul Easwar", price:8.5, status:"active", seedPoints:15},
+  {id:"sreeraj_ks", name:"Sreeraj K. S.", price:7.5, status:"active", seedPoints:15},
+  {id:"mridula_vijai", name:"Mridula Vijai", price:7.5, status:"active", seedPoints:15},
+  {id:"sreelakshmi_arakkal", name:"Sreelakshmi Arakkal", price:7.0, status:"active", seedPoints:15},
+  {id:"rakesh_jacob", name:"Rakesh Jacob", price:7.0, status:"active", seedPoints:15},
+  {id:"aiswarya", name:"Aiswarya", price:6.5, status:"active", seedPoints:15},
+  {id:"vignesh_venu", name:"Vignesh Venu", price:6.5, status:"active", seedPoints:15},
+  {id:"noby_binu", name:"Noby Binu", price:6.5, status:"active", seedPoints:15},
+  {id:"loletta_rodrigues", name:"Loletta Loryne Rodrigues", price:6.5, status:"active", seedPoints:15},
+  {id:"shijin_s", name:"Shijin S.", price:6.5, status:"active", seedPoints:15},
+  {id:"shibina", name:"Shibina", price:6.0, status:"active", seedPoints:10},
+  {id:"tashi", name:"Tashi", price:6.0, status:"active", seedPoints:10},
+  {id:"anjali", name:"Anjali", price:6.0, status:"active", seedPoints:15},
+  {id:"azif", name:"Azif", price:6.0, status:"active", seedPoints:15},
+  {id:"gautam", name:"Gautam", price:6.0, status:"active", seedPoints:15},
+  {id:"neha", name:"Neha", price:6.0, status:"active", seedPoints:15},
+  {id:"sumesh", name:"Sumesh", price:6.0, status:"active", seedPoints:15},
+  {id:"sreelaya", name:"Sreelaya", price:6.0, status:"evicted", seedPoints:-10},
+  {id:"rini_ann_george", name:"Rini Ann George", price:7.0, status:"evicted", seedPoints:-15},
+  {id:"dhanya", name:"Dhanya", price:6.0, status:"evicted", seedPoints:-15}
+];
+const BUDGET = 100;
+const SQUAD_MAX = 15, STARTING_MAX = 11, STARTING_FLOOR = 5;
+const ADMIN_PIN = "2026";
+const QUICK_EVENTS = [
+  {label:"Survived (+5)", val:5},
+  {label:"Task win (+10)", val:10},
+  {label:"House captain (+15)", val:15},
+  {label:"Housemate of week (+20)", val:20},
+  {label:"Warning (-5)", val:-5},
+  {label:"Rule violation (-10)", val:-10},
+  {label:"Evicted (-20)", val:-20}
+];
+
+let squad = [], starting = [], captainId = null, confirmed = false;
+let displayName = "", deadlineMs = null, gwNum = 1, lastTotal = -1;
+let overrides = {};      // { contestantId: { status, totalPoints } }, mirrors Firestore contestants/{id}
+let customContestants = []; // contestants added via Admin, not in the hardcoded seed list
+function allContestants(){ return CONTESTANTS.concat(customContestants); }
+let leagues = [];        // leagues the signed-in user belongs to
+let leaderboardUsers = []; // for global leaderboard
+let adminUnlocked = false;
+
+function getStatus(c){ return (overrides[c.id] && overrides[c.id].status) || c.status; }
+function getPoints(c){ return (overrides[c.id] && typeof overrides[c.id].totalPoints === "number") ? overrides[c.id].totalPoints : (c.seedPoints || 0); }
+function activeN(){ return allContestants().filter(c=>getStatus(c)==="active").length; }
+function totalSquadCap(){ return Math.min(SQUAD_MAX, activeN()); }
+function startingCap(){ return Math.min(STARTING_MAX, Math.max(STARTING_FLOOR, activeN()), totalSquadCap()); }
+function initials(n){ return n.split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase(); }
+function creditsUsed(){ return squad.reduce((s,id)=>s + allContestants().find(c=>c.id===id).price, 0); }
+
+// ============ FIRESTORE: CONTESTANTS (shared, real-time) ============
+function watchContestants(){
+  onSnapshot(collection(db, "contestants"), (snap)=>{
+    const seedIds = new Set(CONTESTANTS.map(c=>c.id));
+    const nextCustom = [];
+    snap.forEach(d=>{
+      const data = d.data();
+      overrides[d.id] = data;
+      if(!seedIds.has(d.id) && data.name && typeof data.price === "number"){
+        nextCustom.push({id:d.id, name:data.name, price:data.price, status:data.status||"active"});
+      }
+    });
+    customContestants = nextCustom;
+    renderDraft(); renderMyTeam(); if(adminUnlocked) renderAdmin();
+    if(uid && confirmed && computeSeasonTotal() !== lastTotal) persistUserDoc();
+  });
+}
+async function addContestant(name, price){
+  const id = "c_" + name.trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/(^_|_$)/g,"") + "_" + Math.random().toString(36).slice(2,6);
+  await setDoc(doc(db, "contestants", id), {name: name.trim(), price, status:"active", totalPoints:0});
+}
+async function setContestantOverride(id, patch){
+  await setDoc(doc(db, "contestants", id), patch, {merge:true});
+  // local overrides updates via onSnapshot automatically
+}
+
+// ============ DEADLINE + SORTING ============
+function watchConfig(){
+  onSnapshot(doc(db,"config","current"), s=>{
+    const d = s.exists() ? s.data() : {};
+    deadlineMs = d.deadlineMs || null; gwNum = d.gameweek || 1;
+    renderDeadline(); renderDraft(); renderMyTeam(); if(adminUnlocked) renderAdmin();
+  });
+}
+function locked(){ return deadlineMs !== null && Date.now() > deadlineMs; }
+function renderDeadline(){
+  const el = document.getElementById("deadlineBanner"); if(!el) return;
+  if(!deadlineMs){ el.textContent = "Deadline not announced yet"; return; }
+  const diff = deadlineMs - Date.now();
+  if(diff <= 0){ el.textContent = `Gameweek ${gwNum} is locked. Teams can't change until the next deadline.`; return; }
+  const when = new Date(deadlineMs).toLocaleString([], {weekday:"short", day:"numeric", month:"short", hour:"numeric", minute:"2-digit"});
+  const h = Math.floor(diff/36e5), left = h >= 24 ? Math.floor(h/24)+"d "+(h%24)+"h" : h+"h "+Math.floor(diff%36e5/6e4)+"m";
+  el.textContent = `Gameweek ${gwNum} deadline: ${when} (${left} left)`;
+}
+setInterval(renderDeadline, 30000);
+function sortedContestants(){
+  return [...CONTESTANTS].sort((a,b)=>{
+    const ea = getStatus(a)==="evicted", eb = getStatus(b)==="evicted";
+    if(ea !== eb) return ea ? 1 : -1;
+    return (getPoints(b)-getPoints(a)) || (b.price-a.price);
+  });
+}
+
+// ============ FIRESTORE: USER TEAM ============
+async function loadUserDoc(){
+  const snap = await getDoc(doc(db, "users", uid));
+  loadUserDoc.found = snap.exists();
+  if(snap.exists()){
+    const d = snap.data();
+    squad = d.squad || []; starting = d.starting || []; captainId = d.captainId || null; confirmed = d.confirmed || false; displayName = d.displayName || "";
+  }
+}
+async function persistUserDoc(){
+  const emailName = auth.currentUser && auth.currentUser.email ? auth.currentUser.email.split("@")[0] : "Player";
+  await setDoc(doc(db, "users", uid), {
+    squad, starting, captainId, confirmed,
+    totalPoints: (lastTotal = computeSeasonTotal()),
+    displayName: displayName || emailName
+  }, {merge:true});
+}
+function computeSeasonTotal(){
+  return squad.filter(id=>starting.includes(id)).reduce((s,id)=>{
+    const c = allContestants().find(x=>x.id===id);
+    return s + getPoints(c) * (captainId===id ? 2 : 1);
+  }, 0);
+}
+
+// ============ FIRESTORE: LEAGUES ============
+function genCode(){ return Math.random().toString(36).slice(2, 8).toUpperCase(); }
+function watchLeagues(){
+  const q = query(collection(db, "leagues"), where("members", "array-contains", uid));
+  onSnapshot(q, (snap)=>{
+    leagues = [];
+    snap.forEach(d=> leagues.push({id:d.id, ...d.data()}));
+    renderLeagues();
+  });
+}
+async function createLeague(name){
+  const code = genCode();
+  await setDoc(doc(db, "leagues", code), {
+    name, code, ownerUid: uid, members: [uid]
+  });
+}
+async function joinLeague(code){
+  const ref = doc(db, "leagues", code);
+  const snap = await getDoc(ref);
+  if(!snap.exists()){ return false; }
+  await updateDoc(ref, { members: arrayUnion(uid) });
+  return true;
+}
+
+// ============ FIRESTORE: GLOBAL LEADERBOARD ============
+function watchLeaderboard(){
+  onSnapshot(collection(db, "users"), (snap)=>{
+    leaderboardUsers = [];
+    snap.forEach(d=> leaderboardUsers.push({uid:d.id, ...d.data()}));
+    leaderboardUsers.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0));
+    renderLeaderboard();
+  });
+}
+
+// ============ RENDER: DRAFT ============
+function enforceCaps(){
+  squad = squad.filter(id => { const c = allContestants().find(x=>x.id===id); return c && getStatus(c)==="active"; });
+  const sCap = totalSquadCap();
+  if(squad.length > sCap){ squad = squad.slice(0, sCap); }
+  starting = starting.filter(id => squad.includes(id));
+  const stCap = startingCap();
+  if(starting.length > stCap){ starting = starting.slice(0, stCap); }
+  if(captainId && !starting.includes(captainId)) captainId = null;
+}
+
+function renderDraft(){
+  enforceCaps();
+  const cap = totalSquadCap();
+  const list = document.getElementById("contestantList");
+  list.innerHTML = "";
+  sortedContestants().forEach(c=>{
+    const picked = squad.includes(c.id);
+    const st = getStatus(c);
+    const div = document.createElement("div");
+    div.className = "card" + (st==="evicted" ? " evicted" : "") + (picked ? " picked" : "");
+    div.innerHTML = `
+      <div class="avatar">${initials(c.name)}</div>
+      <div class="grow">
+        <p class="name">${c.name}</p>
+        <p class="meta">${c.price.toFixed(1)} credits &middot; <b>${getPoints(c)} pts</b>${st==="evicted" ? " &middot; evicted" : ""}</p>
+      </div>
+      <button data-toggle="${c.id}" ${(st==="evicted" || confirmed || locked()) ? "disabled" : ""}>${picked ? "Remove" : "Add"}</button>
+    `;
+    list.appendChild(div);
+  });
+  document.getElementById("creditsLeft").textContent = (BUDGET - creditsUsed()).toFixed(1);
+  document.getElementById("squadCount").textContent = squad.length;
+  document.getElementById("squadMax").textContent = cap;
+
+  const confirmBtn = document.getElementById("confirmBtn");
+  const hint = document.getElementById("confirmHint");
+  if(confirmed){
+    confirmBtn.textContent = "Edit squad";
+    confirmBtn.disabled = locked();
+    hint.textContent = "Squad confirmed. Set your starting line-up in My team.";
+  } else {
+    confirmBtn.textContent = "Confirm squad";
+    confirmBtn.disabled = squad.length !== cap || locked();
+    hint.textContent = squad.length === cap ? "" : `Pick ${cap - squad.length} more to confirm`;
+  }
+  confirmBtn.onclick = async () => {
+    if(locked()) return;
+    confirmed = !confirmed;
+    await persistUserDoc();
+    renderDraft(); renderMyTeam();
+  };
+
+  list.querySelectorAll("[data-toggle]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.getAttribute("data-toggle");
+      const c = allContestants().find(x=>x.id===id);
+      if(squad.includes(id)){
+        squad = squad.filter(s=>s!==id);
+        starting = starting.filter(s=>s!==id);
+        if(captainId === id) captainId = null;
+      } else {
+        if(squad.length >= cap){ return; }
+        if(creditsUsed() + c.price > BUDGET){ return; }
+        squad.push(id);
+      }
+      await persistUserDoc();
+      renderDraft(); renderMyTeam();
+    });
+  });
+}
+
+// ============ RENDER: MY TEAM ============
+function renderMyTeam(){
+  enforceCaps();
+  const el = document.getElementById("myTeamView");
+  const sqCap = totalSquadCap(), stCap = startingCap();
+  if(squad.length < sqCap || !confirmed){
+    const msg = squad.length < sqCap
+      ? `Draft your full squad of ${sqCap} first, then confirm it to set your starting line-up.`
+      : `Head to the Draft tab and tap "Confirm squad" to unlock your starting line-up.`;
+    el.innerHTML = `<p class="sub" style="margin-top:20px;text-align:center;">${msg}</p>`;
+    return;
+  }
+  const row = (id) => {
+    const c = allContestants().find(x=>x.id===id);
+    const isStarting = starting.includes(id);
+    const isCap = captainId === id;
+    const pts = getPoints(c) * (isCap ? 2 : 1);
+    return `<div class="card">
+      <div class="avatar">${initials(c.name)}</div>
+      <div class="grow"><p class="name">${c.name}</p><p class="meta">${c.price.toFixed(1)} credits${isCap ? " &middot; captain (2x)" : ""}</p></div>
+      ${isStarting ? `<span class="icon-toggle ${isCap ? "on" : "off"}" title="Captain" data-crown="${id}">&#128081;</span>` : ""}
+      <span class="icon-toggle ${isStarting ? "on" : "off"}" title="Starting" data-star="${id}">${isStarting ? "&#11088;" : "&#9734;"}</span>
+      ${isStarting ? `<span style="font-size:13px;font-weight:600;min-width:24px;text-align:right;">${pts}</span>` : ""}
+    </div>`;
+  };
+  const startList = squad.filter(id=>starting.includes(id));
+  const benchList = squad.filter(id=>!starting.includes(id));
+  const seasonTotal = computeSeasonTotal();
+  el.innerHTML = `
+    <p class="sectionlabel">Starting (${startList.length}/${stCap}) &middot; tap star to set, crown for captain</p>
+    ${startList.map(row).join("") || `<p class="sub">No starters picked yet.</p>`}
+    <p class="sectionlabel">Bench</p>
+    ${benchList.map(row).join("") || `<p class="sub">Everyone's in the starting line-up.</p>`}
+    <div class="card" style="margin-top:12px;">
+      <div class="grow"><p class="name">Total points this season</p><p class="meta">Synced live from Firestore</p></div>
+      <p style="font-size:20px;font-weight:600;margin:0;">${seasonTotal}</p>
+    </div>
+  `;
+  el.querySelectorAll("[data-star]").forEach(el2=>{
+    el2.addEventListener("click", async ()=>{
+      if(locked()) return; const id = el2.getAttribute("data-star");
+      if(starting.includes(id)){
+        starting = starting.filter(s=>s!==id);
+        if(captainId===id) captainId = null;
+      } else {
+        if(starting.length >= stCap){ return; }
+        starting.push(id);
+      }
+      await persistUserDoc();
+      renderMyTeam();
+    });
+  });
+  el.querySelectorAll("[data-crown]").forEach(el2=>{
+    el2.addEventListener("click", async ()=>{
+      if(locked()) return; const id = el2.getAttribute("data-crown");
+      captainId = (captainId === id) ? null : id;
+      await persistUserDoc();
+      renderMyTeam();
+    });
+  });
+}
+
+// ============ RENDER: LEADERBOARD ============
+function renderLeaderboard(){
+  const el = document.getElementById("leaderboardView");
+  const top = leaderboardUsers.slice(0, 10);
+  const myIndex = leaderboardUsers.findIndex(u=>u.uid===uid);
+  const rows = top.map((u,i)=>`
+    <div class="lbrow ${u.uid===uid ? "you" : ""}"><span class="rank">${i+1}</span>
+      <div class="avatar" style="width:28px;height:28px;font-size:11px;">${initials(u.displayName||"You")}</div>
+      <p class="name grow">${u.uid===uid ? "You" : (u.displayName||"Player")}</p><p style="font-weight:600;font-size:14px;margin:0;">${u.totalPoints||0}</p>
+    </div>`).join("");
+  let youRow = "";
+  if(myIndex >= 10){
+    const me = leaderboardUsers[myIndex];
+    youRow = `<div class="lbrow you"><span class="rank">${myIndex+1}</span>
+      <div class="avatar" style="width:28px;height:28px;font-size:11px;">YO</div>
+      <p class="name grow">You</p><p style="font-weight:600;font-size:14px;margin:0;">${me.totalPoints||0}</p>
+    </div>`;
+  }
+  el.innerHTML = `<div class="card" style="flex-direction:column;align-items:stretch;">${rows || '<p class="sub">No players yet — be the first!</p>'}${youRow}</div>`;
+}
+
+// ============ RENDER: LEAGUES ============
+function renderLeagues(){
+  const el = document.getElementById("leaguesView");
+  const formHtml = `
+    <div class="card" style="flex-direction:column;align-items:stretch;gap:8px;">
+      <p class="name">Create a league</p>
+      <input id="newLeagueName" type="text" placeholder="e.g. Kerala fam group" style="height:36px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 10px;font-size:13px;">
+      <button class="btn-primary" id="createLeagueBtn" style="margin-top:0;">Create league</button>
+    </div>
+    <div class="card" style="flex-direction:column;align-items:stretch;gap:8px;">
+      <p class="name">Join a league</p>
+      <input id="joinLeagueCode" type="text" placeholder="Enter invite code" style="height:36px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 10px;font-size:13px;text-transform:uppercase;">
+      <button class="btn-primary" id="joinLeagueBtn" style="margin-top:0;">Join league</button>
+      <p class="note" id="joinLeagueHint"></p>
+    </div>
+  `;
+  const leagueCards = leagues.map(lg=>{
+    const shareUrl = "https://wa.me/?text=" + encodeURIComponent(`Join my Bigg Boss fantasy league "${lg.name}" — code: ${lg.code}`);
+    return `
+      <div class="card" style="flex-direction:column;align-items:stretch;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <p class="name">${lg.name}</p>
+          <span class="meta">Code: ${lg.code}</span>
+        </div>
+        <p class="meta">${(lg.members||[]).length} member${(lg.members||[]).length===1?"":"s"}</p>
+        <a href="${shareUrl}" style="text-decoration:none;">
+          <button style="width:100%;margin-top:8px;">Share invite on WhatsApp</button>
+        </a>
+      </div>
+    `;
+  }).join("");
+  el.innerHTML = formHtml + (leagueCards || `<p class="sub" style="text-align:center;">You haven't joined a league yet.</p>`);
+
+  document.getElementById("createLeagueBtn").addEventListener("click", async ()=>{
+    const nameInput = document.getElementById("newLeagueName");
+    const name = nameInput.value.trim();
+    if(!name){ nameInput.style.borderColor = "var(--accent)"; return; }
+    await createLeague(name);
+  });
+  document.getElementById("joinLeagueBtn").addEventListener("click", async ()=>{
+    const codeInput = document.getElementById("joinLeagueCode");
+    const code = codeInput.value.trim().toUpperCase();
+    if(!code){ codeInput.style.borderColor = "var(--accent)"; return; }
+    const ok = await joinLeague(code);
+    document.getElementById("joinLeagueHint").textContent = ok ? "" : "No league found with that code.";
+  });
+}
+
+// ============ RENDER: ADMIN ============
+function renderAdmin(){
+  const el = document.getElementById("adminView");
+  const rows = allContestants().map(c=>{
+    const st = getStatus(c);
+    const pts = getPoints(c);
+    const quickBtns = QUICK_EVENTS.map(ev=>
+      `<button data-quick="${c.id}:${ev.val}" style="font-size:11px;padding:5px 8px;">${ev.label}</button>`
+    ).join("");
+    return `
+      <div class="card" style="flex-direction:column;align-items:stretch;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <div>
+            <p class="name">${c.name}</p>
+            <p class="meta">${st==="active" ? "Active" : "Evicted"} &middot; ${pts} pts total</p>
+          </div>
+          <button data-evict="${c.id}">${st==="active" ? "Mark evicted" : "Reinstate"}</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">${quickBtns}</div>
+      </div>
+    `;
+  }).join("");
+  const dl = deadlineMs ? new Date(deadlineMs - new Date().getTimezoneOffset()*60000).toISOString().slice(0,16) : "";
+  el.innerHTML = `<div class="card rc"><p class="name">Add a contestant</p>
+    <input class="inp" id="newContName" type="text" placeholder="Name (e.g. Komban)">
+    <input class="inp" id="newContPrice" type="number" step="0.5" min="4" max="10" value="6.0" placeholder="Starting credit price">
+    <button class="btn-primary" id="addContBtn" style="margin-top:0;">Add contestant</button>
+    <p class="note" id="addContMsg"></p></div>
+    <div class="card rc"><p class="name">Gameweek deadline</p>
+    <input class="inp" id="gwNumInput" type="number" min="1" value="${gwNum}">
+    <input class="inp" id="gwDeadlineInput" type="datetime-local" value="${dl}">
+    <button class="btn-primary" id="saveDeadlineBtn" style="margin-top:0;">Save deadline</button>
+    <p class="meta">Leave the time empty to clear the deadline.</p></div>
+    <p class="note" style="margin-bottom:10px;">Changes here write to Firestore and sync to every user's app instantly.</p>${rows}`;
+  document.getElementById("addContBtn").onclick = async ()=>{
+    const name = document.getElementById("newContName").value.trim();
+    const price = parseFloat(document.getElementById("newContPrice").value);
+    const msg = document.getElementById("addContMsg");
+    if(!name || !price){ msg.textContent = "Enter a name and a price."; return; }
+    await addContestant(name, price);
+    document.getElementById("newContName").value = "";
+    msg.textContent = `Added ${name}.`;
+  };
+  document.getElementById("saveDeadlineBtn").onclick = async ()=>{
+    const v = document.getElementById("gwDeadlineInput").value;
+    await setDoc(doc(db,"config","current"), {deadlineMs: v ? new Date(v).getTime() : null, gameweek: parseInt(document.getElementById("gwNumInput").value,10) || 1}, {merge:true});
+  };
+
+  el.querySelectorAll("[data-evict]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.getAttribute("data-evict");
+      const c = allContestants().find(x=>x.id===id);
+      const newStatus = getStatus(c)==="active" ? "evicted" : "active";
+      await setContestantOverride(id, {status:newStatus});
+    });
+  });
+  el.querySelectorAll("[data-quick]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const [id, val] = btn.getAttribute("data-quick").split(":");
+      const c = allContestants().find(x=>x.id===id);
+      const current = getPoints(c);
+      await setContestantOverride(id, {totalPoints: current + parseInt(val, 10)});
+    });
+  });
+}
+
+document.getElementById("adminUnlockBtn").addEventListener("click", ()=>{
+  const pin = document.getElementById("adminPin").value;
+  if(pin === ADMIN_PIN){
+    adminUnlocked = true;
+    document.getElementById("adminGate").style.display = "none";
+    document.getElementById("adminView").style.display = "block";
+    renderAdmin();
+  } else {
+    document.getElementById("adminGateHint").textContent = "Incorrect PIN.";
+  }
+});
+
+// ============ TAB WIRING ============
+document.querySelectorAll('[data-subtab]').forEach(t=>{
+  t.addEventListener("click", ()=>{
+    document.querySelectorAll('[data-subtab]').forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    const isGlobal = t.getAttribute("data-subtab") === "global";
+    document.getElementById("leaderboardView").style.display = isGlobal ? "" : "none";
+    document.getElementById("leaguesView").style.display = isGlobal ? "none" : "";
+    if(!isGlobal) renderLeagues();
+  });
+});
+document.querySelectorAll(".tab[data-tab]").forEach(tab=>{
+  tab.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab[data-tab]").forEach(t=>t.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    tab.classList.add("active");
+    document.getElementById("panel-" + tab.getAttribute("data-tab")).classList.add("active");
+  });
+});
+
+// ============ BOOT / AUTH GATE ============
+function showBootMessage(msg){
+  const target = document.getElementById("contestantList");
+  if(target) target.innerHTML = `<div class="card" style="flex-direction:column;align-items:stretch;"><p class="name">Can't load yet</p><p class="meta">${msg}</p></div>`;
+}
+
+let isSignupMode = false;
+
+function setAuthMode(signup){
+  isSignupMode = signup;
+  document.getElementById("authTitle").textContent = signup ? "Sign up" : "Log in";
+  document.getElementById("authSubmitBtn").textContent = signup ? "Create account" : "Log in";
+  document.getElementById("authToggleText").textContent = signup ? "Already have an account?" : "New here?";
+  document.getElementById("authToggleLink").textContent = signup ? "Log in" : "Sign up";
+  document.getElementById("authError").textContent = "";
+}
+
+document.getElementById("authToggleLink").addEventListener("click", (e)=>{
+  e.preventDefault();
+  setAuthMode(!isSignupMode);
+});
+
+document.getElementById("authSubmitBtn").addEventListener("click", async ()=>{
+  const email = document.getElementById("authEmail").value.trim();
+  const password = document.getElementById("authPassword").value;
+  const errorEl = document.getElementById("authError");
+  errorEl.textContent = "";
+  if(!email || !password){
+    errorEl.textContent = "Enter both email and password.";
+    return;
+  }
+  try{
+    if(isSignupMode){
+      await createUserWithEmailAndPassword(auth, email, password);
+    } else {
+      await signInWithEmailAndPassword(auth, email, password);
+    }
+  }catch(e){
+    const messages = {
+      "auth/email-already-in-use": "That email already has an account — try logging in instead.",
+      "auth/invalid-email": "That doesn't look like a valid email address.",
+      "auth/weak-password": "Password must be at least 6 characters.",
+      "auth/wrong-password": "Incorrect password.",
+      "auth/invalid-credential": "Incorrect email or password.",
+      "auth/user-not-found": "No account found with that email — try signing up instead."
+    };
+    errorEl.textContent = messages[e.code] || ("Error: " + e.code);
+  }
+});
+
+document.getElementById("logoutBtn").addEventListener("click", async ()=>{
+  await signOut(auth);
+});
+
+async function boot(){
+  if(FIREBASE_CONFIG.apiKey === "YOUR_API_KEY"){
+    showBootMessage("Firebase isn't configured yet. Open index.html, find FIREBASE_CONFIG near the top of the &lt;script&gt; tag, and paste in your real project config from the Firebase console.");
+    return;
+  }
+  onAuthStateChanged(auth, async (user)=>{
+    if(user){
+      uid = user.uid;
+      document.getElementById("authGate").style.display = "none";
+      document.getElementById("mainApp").style.display = "block";
+      showBootMessage("Loading…");
+      await loadUserDoc();
+      if(!loadUserDoc.found) await persistUserDoc();
+      watchConfig(); applyAdminPath(); renderProfile();
+      watchContestants();
+      watchLeaderboard();
+      watchLeagues();
+      renderDraft(); renderMyTeam();
+    } else {
+      uid = null;
+      document.getElementById("profileModal").style.display = "none";
+      document.getElementById("authGate").style.display = "block";
+      document.getElementById("mainApp").style.display = "none";
+    }
+  });
+}
+boot();
+
+function applyAdminPath(){
+  if(location.pathname.replace(/\/+$/,"") === "/admin"){
+    const b = document.getElementById("adminTabBtn");
+    b.style.display = ""; b.click();
+  }
+}
+function renderProfile(){
+  const u = auth.currentUser; if(!u) return;
+  const name = displayName || u.email.split("@")[0];
+  document.getElementById("profileBtn").textContent = initials(name);
+  document.getElementById("profileEmail").textContent = u.email;
+  document.getElementById("profileName").value = name;
+}
+document.getElementById("profileBtn").onclick = ()=>{ renderProfile(); document.getElementById("profileMsg").textContent=""; document.getElementById("profileModal").style.display = "flex"; };
+document.getElementById("profileClose").onclick = ()=>{ document.getElementById("profileModal").style.display = "none"; };
+document.getElementById("saveNameBtn").onclick = async ()=>{
+  const v = document.getElementById("profileName").value.trim(); if(!v) return;
+  displayName = v; await persistUserDoc(); renderProfile();
+  document.getElementById("profileMsg").textContent = "Name saved.";
+};
+document.getElementById("changePwBtn").onclick = async ()=>{
+  const msg = document.getElementById("profileMsg"), u = auth.currentUser;
+  const cur = document.getElementById("curPw").value, nw = document.getElementById("newPw").value;
+  if(!cur || nw.length < 6){ msg.textContent = "Enter your current password and a new one (6+ characters)."; return; }
+  try{
+    await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, cur));
+    await updatePassword(u, nw);
+    msg.textContent = "Password changed.";
+    document.getElementById("curPw").value = ""; document.getElementById("newPw").value = "";
+  }catch(e){
+    msg.textContent = (e.code==="auth/wrong-password" || e.code==="auth/invalid-credential") ? "Current password is incorrect." : "Couldn't change password: " + e.code;
+  }
+};
+let resetArmed = false;
+document.getElementById("resetBtn").addEventListener("click", async ()=>{
+  if(locked()) return;
+  const b = document.getElementById("resetBtn");
+  if(!resetArmed){ resetArmed = true; b.textContent = "Tap again to clear your squad"; setTimeout(()=>{ resetArmed = false; b.textContent = "Reset squad"; }, 3000); return; }
+  resetArmed = false; b.textContent = "Reset squad";
+  squad = []; starting = []; captainId = null; confirmed = false;
+  await persistUserDoc(); renderDraft(); renderMyTeam();
+});
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(e=>console.error("SW registration failed", e));
+  });
+}
+</script>
+</body></html>
