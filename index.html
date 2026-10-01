@@ -636,10 +636,21 @@ function renderAdmin(){
     const name = document.getElementById("newContName").value.trim();
     const price = parseFloat(document.getElementById("newContPrice").value);
     const msg = document.getElementById("addContMsg");
-    if(!name || !price){ msg.textContent = "Enter a name and a price."; return; }
-    await addContestant(name, price);
-    document.getElementById("newContName").value = "";
-    msg.textContent = `Added ${name}.`;
+    msg.style.color = "var(--accent)";
+    if(!name){ msg.textContent = "Enter a name first."; return; }
+    if(isNaN(price) || price <= 0){ msg.textContent = "Enter a valid price (e.g. 6.0)."; return; }
+    msg.style.color = "var(--text2)";
+    msg.textContent = "Saving…";
+    try{
+      await addContestant(name, price);
+      document.getElementById("newContName").value = "";
+      msg.style.color = "#2f6b3a";
+      msg.textContent = `Saved "${name}" — check the Draft tab now.`;
+    }catch(e){
+      console.error("addContestant failed", e);
+      msg.style.color = "var(--accent)";
+      msg.textContent = "Couldn't save: " + (e.code || e.message || "unknown error") + ". Check you're still logged in and try again.";
+    }
   };
   document.getElementById("saveDeadlineBtn").onclick = async ()=>{
     const v = document.getElementById("gwDeadlineInput").value;
