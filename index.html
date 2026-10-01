@@ -453,13 +453,17 @@ function renderMyTeam(){
   enforceCaps();
   const el = document.getElementById("myTeamView");
   const sqCap = totalSquadCap(), stCap = startingCap();
-  if(squad.length < sqCap || !confirmed){
+  if(!confirmed){
     const msg = squad.length < sqCap
       ? `Draft your full squad of ${sqCap} first, then confirm it to set your starting line-up.`
       : `Head to the Draft tab and tap "Confirm squad" to unlock your starting line-up.`;
     el.innerHTML = `<p class="sub" style="margin-top:20px;text-align:center;">${msg}</p>`;
     return;
   }
+  const emptySlots = sqCap - squad.length;
+  const slotBanner = emptySlots > 0
+    ? `<div class="card rc" style="margin-bottom:12px;border-color:var(--accent);"><p class="name">An evicted pick left ${emptySlots} empty slot${emptySlots>1?"s":""}</p><p class="meta">Head to the Draft tab to add a free replacement — no cost, their credits are already freed up.</p></div>`
+    : "";
   const row = (id) => {
     const c = allContestants().find(x=>x.id===id);
     const isStarting = starting.includes(id);
@@ -482,6 +486,7 @@ function renderMyTeam(){
         : `Deadline: ${new Date(deadlineMs).toLocaleString([], {weekday:"short", day:"numeric", month:"short", hour:"numeric", minute:"2-digit"})}`)
     : "Deadline not announced yet";
   el.innerHTML = `
+    ${slotBanner}
     <div class="card rc" style="margin-bottom:12px;">
       <p class="name">Pick team for this week &middot; Gameweek ${gwNum}</p>
       <p class="meta">${dlText}${locked() ? " You can't make changes until the next gameweek opens." : " Set your starting XI and substitutes below before the deadline."}</p>
