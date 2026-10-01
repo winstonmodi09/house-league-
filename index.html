@@ -103,7 +103,8 @@ button:active{transform:scale(0.97);}
   <div class="tabs">
     <div class="tab active" data-tab="draft">Draft</div>
     <div class="tab" data-tab="team">My team</div>
-    <div class="tab" data-tab="board">Leaderboard</div>
+    <div class="tab" data-tab="board">Overall</div>
+    <div class="tab" data-tab="leagues">Leagues</div>
     <div class="tab" data-tab="rules">Rules</div>
     <div class="tab" data-tab="admin" id="adminTabBtn" style="display:none;">Admin</div>
   </div>
@@ -126,12 +127,11 @@ button:active{transform:scale(0.97);}
   </div>
 
   <div class="panel" id="panel-board">
-    <div class="tabs" style="margin-bottom:12px;">
-      <div class="tab active" data-subtab="global">Global</div>
-      <div class="tab" data-subtab="leagues">My leagues</div>
-    </div>
     <div id="leaderboardView"></div>
-    <div id="leaguesView" style="display:none;"></div>
+  </div>
+
+  <div class="panel" id="panel-leagues">
+    <div id="leaguesView"></div>
   </div>
 
   <div class="panel" id="panel-rules">
@@ -188,7 +188,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, onSnapshot, collection,
-  query, where, updateDoc, arrayUnion
+  query, where, updateDoc, arrayUnion, documentId, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const fbApp = initializeApp(FIREBASE_CONFIG);
@@ -524,32 +524,18 @@ function renderLeagues(){
   const formHtml = `
     <div class="card" style="flex-direction:column;align-items:stretch;gap:8px;">
       <p class="name">Create a league</p>
-      <input id="newLeagueName" type="text" placeholder="e.g. Kerala fam group" style="height:36px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 10px;font-size:13px;">
+      <input id="newLeagueName" class="inp" type="text" placeholder="e.g. Kerala fam group">
       <button class="btn-primary" id="createLeagueBtn" style="margin-top:0;">Create league</button>
     </div>
     <div class="card" style="flex-direction:column;align-items:stretch;gap:8px;">
       <p class="name">Join a league</p>
-      <input id="joinLeagueCode" type="text" placeholder="Enter invite code" style="height:36px;border-radius:9px;border:1px solid var(--border);background:var(--bg);color:var(--text);padding:0 10px;font-size:13px;text-transform:uppercase;">
+      <input id="joinLeagueCode" class="inp" type="text" placeholder="Enter invite code" style="text-transform:uppercase;">
       <button class="btn-primary" id="joinLeagueBtn" style="margin-top:0;">Join league</button>
       <p class="note" id="joinLeagueHint"></p>
     </div>
+    <div id="leagueCards"><p class="sub" style="text-align:center;">Loading your leagues…</p></div>
   `;
-  const leagueCards = leagues.map(lg=>{
-    const shareUrl = "https://wa.me/?text=" + encodeURIComponent(`Join my Bigg Boss fantasy league "${lg.name}" — code: ${lg.code}`);
-    return `
-      <div class="card" style="flex-direction:column;align-items:stretch;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <p class="name">${lg.name}</p>
-          <span class="meta">Code: ${lg.code}</span>
-        </div>
-        <p class="meta">${(lg.members||[]).length} member${(lg.members||[]).length===1?"":"s"}</p>
-        <a href="${shareUrl}" style="text-decoration:none;">
-          <button style="width:100%;margin-top:8px;">Share invite on WhatsApp</button>
-        </a>
-      </div>
-    `;
-  }).join("");
-  el.innerHTML = formHtml + (leagueCards || `<p class="sub" style="text-align:center;">You haven't joined a league yet.</p>`);
+  el.innerHTML = formHtml;
 
   document.getElementById("createLeagueBtn").addEventListener("click", async ()=>{
     const nameInput = document.getElementById("newLeagueName");
@@ -564,6 +550,48 @@ function renderLeagues(){
     const ok = await joinLeague(code);
     document.getElementById("joinLeagueHint").textContent = ok ? "" : "No league found with that code.";
   });
+
+  renderLeagueCards();
+}
+
+async function renderLeagueCards(){
+  const container = document.getElementById("leagueCards");
+  if(!container) return;
+  if(leagues.length === 0){
+    container.innerHTML = `<p class="sub" style="text-align:center;">You haven't joined a league yet.</p>`;
+    return;
+  }
+  const cardsHtml = await Promise.all(leagues.map(async (lg)=>{
+    const members = (lg.members||[]).slice(0, 30);
+    let rows = "";
+    if(members.length){
+      const q = query(collection(db,"users"), where(documentId(), "in", members));
+      const snap = await getDocs(q);
+      const memberData = [];
+      snap.forEach(d=> memberData.push({uid:d.id, ...d.data()}));
+      memberData.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0));
+      rows = memberData.map((m,i)=>`
+        <div class="lbrow ${m.uid===uid ? "you" : ""}"><span class="rank">${i+1}</span>
+          <div class="avatar" style="width:26px;height:26px;font-size:10px;">${initials(m.displayName||"Player")}</div>
+          <p class="name grow">${m.uid===uid ? "You" : (m.displayName||"Player")}</p>
+          <p style="font-weight:600;font-size:13px;margin:0;">${m.totalPoints||0}</p>
+        </div>`).join("");
+    }
+    const shareUrl = "https://wa.me/?text=" + encodeURIComponent(`Join my Bigg Boss fantasy league "${lg.name}" — code: ${lg.code}`);
+    return `
+      <div class="card" style="flex-direction:column;align-items:stretch;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <p class="name">${lg.name}</p>
+          <span class="meta">Code: ${lg.code}</span>
+        </div>
+        ${rows || '<p class="sub">No ranked teams yet.</p>'}
+        <a href="${shareUrl}" style="text-decoration:none;">
+          <button style="width:100%;margin-top:8px;">Share invite on WhatsApp</button>
+        </a>
+      </div>
+    `;
+  }));
+  container.innerHTML = cardsHtml.join("");
 }
 
 // ============ RENDER: ADMIN ============
@@ -658,22 +686,13 @@ document.getElementById("adminUnlockBtn").addEventListener("click", ()=>{
 });
 
 // ============ TAB WIRING ============
-document.querySelectorAll('[data-subtab]').forEach(t=>{
-  t.addEventListener("click", ()=>{
-    document.querySelectorAll('[data-subtab]').forEach(x=>x.classList.remove("active"));
-    t.classList.add("active");
-    const isGlobal = t.getAttribute("data-subtab") === "global";
-    document.getElementById("leaderboardView").style.display = isGlobal ? "" : "none";
-    document.getElementById("leaguesView").style.display = isGlobal ? "none" : "";
-    if(!isGlobal) renderLeagues();
-  });
-});
 document.querySelectorAll(".tab[data-tab]").forEach(tab=>{
   tab.addEventListener("click", ()=>{
     document.querySelectorAll(".tab[data-tab]").forEach(t=>t.classList.remove("active"));
     document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
     tab.classList.add("active");
     document.getElementById("panel-" + tab.getAttribute("data-tab")).classList.add("active");
+    if(tab.getAttribute("data-tab") === "leagues") renderLeagues();
   });
 });
 
