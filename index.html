@@ -584,6 +584,10 @@ function renderAdmin(){
           </div>
           <button data-evict="${c.id}">${st==="active" ? "Mark evicted" : "Reinstate"}</button>
         </div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <input class="inp" type="number" data-setval="${c.id}" placeholder="Set exact points" value="${pts}" style="flex:1;">
+          <button data-setbtn="${c.id}">Set</button>
+        </div>
         <div style="display:flex;flex-wrap:wrap;gap:6px;">${quickBtns}</div>
       </div>
     `;
@@ -628,6 +632,15 @@ function renderAdmin(){
       const c = allContestants().find(x=>x.id===id);
       const current = getPoints(c);
       await setContestantOverride(id, {totalPoints: current + parseInt(val, 10)});
+    });
+  });
+  el.querySelectorAll("[data-setbtn]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.getAttribute("data-setbtn");
+      const input = el.querySelector(`[data-setval="${id}"]`);
+      const v = parseInt(input.value, 10);
+      if(isNaN(v)) return;
+      await setContestantOverride(id, {totalPoints: v});
     });
   });
 }
