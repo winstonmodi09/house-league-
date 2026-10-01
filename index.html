@@ -305,9 +305,11 @@ function renderDeadline(){
 }
 setInterval(renderDeadline, 30000);
 function sortedContestants(){
-  return [...CONTESTANTS].sort((a,b)=>{
+  return [...allContestants()].sort((a,b)=>{
     const ea = getStatus(a)==="evicted", eb = getStatus(b)==="evicted";
     if(ea !== eb) return ea ? 1 : -1;
+    const ca = !!a.custom, cb = !!b.custom;
+    if(ca !== cb) return ca ? -1 : 1;
     return (getPoints(b)-getPoints(a)) || (b.price-a.price);
   });
 }
@@ -474,10 +476,19 @@ function renderMyTeam(){
   const startList = squad.filter(id=>starting.includes(id));
   const benchList = squad.filter(id=>!starting.includes(id));
   const seasonTotal = computeSeasonTotal();
+  const dlText = deadlineMs
+    ? (locked()
+        ? `Gameweek ${gwNum} is locked in.`
+        : `Deadline: ${new Date(deadlineMs).toLocaleString([], {weekday:"short", day:"numeric", month:"short", hour:"numeric", minute:"2-digit"})}`)
+    : "Deadline not announced yet";
   el.innerHTML = `
-    <p class="sectionlabel">Starting (${startList.length}/${stCap}) &middot; tap star to set, crown for captain</p>
+    <div class="card rc" style="margin-bottom:12px;">
+      <p class="name">Pick team for this week &middot; Gameweek ${gwNum}</p>
+      <p class="meta">${dlText}${locked() ? " You can't make changes until the next gameweek opens." : " Set your starting XI and substitutes below before the deadline."}</p>
+    </div>
+    <p class="sectionlabel">Starting XI (${startList.length}/${stCap}) &middot; tap star to set, crown for captain</p>
     ${startList.map(row).join("") || `<p class="sub">No starters picked yet.</p>`}
-    <p class="sectionlabel">Bench</p>
+    <p class="sectionlabel">Substitutions &middot; tap star to bring a sub into your starting XI</p>
     ${benchList.map(row).join("") || `<p class="sub">Everyone's in the starting line-up.</p>`}
     <div class="card" style="margin-top:12px;">
       <div class="grow"><p class="name">Total points this season</p><p class="meta">Synced live from Firestore</p></div>
