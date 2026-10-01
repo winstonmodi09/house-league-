@@ -416,11 +416,11 @@ function renderDraft(){
   if(confirmed){
     confirmBtn.textContent = "Edit squad";
     confirmBtn.disabled = locked();
-    hint.textContent = "Squad confirmed. Set your starting line-up in My team.";
+    hint.textContent = locked() ? `Locked for Gameweek ${gwNum} — editing opens again after the next deadline.` : "Squad confirmed. Set your starting line-up in My team.";
   } else {
     confirmBtn.textContent = "Confirm squad";
     confirmBtn.disabled = squad.length !== cap || locked();
-    hint.textContent = squad.length === cap ? "" : `Pick ${cap - squad.length} more to confirm`;
+    hint.textContent = locked() ? `Locked for Gameweek ${gwNum} — editing opens again after the next deadline.` : (squad.length === cap ? "" : `Pick ${cap - squad.length} more to confirm`);
   }
   confirmBtn.onclick = async () => {
     if(locked()) return;
@@ -449,6 +449,14 @@ function renderDraft(){
 }
 
 // ============ RENDER: MY TEAM ============
+function showTeamLockMsg(){
+  const banner = document.getElementById("deadlineBanner");
+  if(!banner) return;
+  const original = banner.textContent;
+  banner.textContent = "Your team is locked until the next gameweek opens.";
+  banner.style.fontWeight = "700";
+  setTimeout(()=>{ banner.textContent = original; banner.style.fontWeight = "500"; }, 2200);
+}
 function renderMyTeam(){
   enforceCaps();
   const el = document.getElementById("myTeamView");
@@ -472,8 +480,8 @@ function renderMyTeam(){
     return `<div class="card">
       <div class="avatar">${initials(c.name)}</div>
       <div class="grow"><p class="name">${c.name}</p><p class="meta">${c.price.toFixed(1)} credits${isCap ? " &middot; captain (2x)" : ""}</p></div>
-      ${isStarting ? `<span class="icon-toggle ${isCap ? "on" : "off"}" title="Captain" data-crown="${id}">&#128081;</span>` : ""}
-      <span class="icon-toggle ${isStarting ? "on" : "off"}" title="Starting" data-star="${id}">${isStarting ? "&#11088;" : "&#9734;"}</span>
+      ${isStarting ? `<span class="icon-toggle ${isCap ? "on" : "off"}" title="Captain" data-crown="${id}" style="${locked()?"opacity:.3;pointer-events:none;":""}">&#128081;</span>` : ""}
+      <span class="icon-toggle ${isStarting ? "on" : "off"}" title="Starting" data-star="${id}" style="${locked()?"opacity:.3;":""}">${isStarting ? "&#11088;" : "&#9734;"}</span>
       ${isStarting ? `<span style="font-size:13px;font-weight:600;min-width:24px;text-align:right;">${pts}</span>` : ""}
     </div>`;
   };
@@ -502,7 +510,7 @@ function renderMyTeam(){
   `;
   el.querySelectorAll("[data-star]").forEach(el2=>{
     el2.addEventListener("click", async ()=>{
-      if(locked()) return; const id = el2.getAttribute("data-star");
+      if(locked()){ showTeamLockMsg(); return; } const id = el2.getAttribute("data-star");
       if(starting.includes(id)){
         starting = starting.filter(s=>s!==id);
         if(captainId===id) captainId = null;
@@ -516,7 +524,7 @@ function renderMyTeam(){
   });
   el.querySelectorAll("[data-crown]").forEach(el2=>{
     el2.addEventListener("click", async ()=>{
-      if(locked()) return; const id = el2.getAttribute("data-crown");
+      if(locked()){ showTeamLockMsg(); return; } const id = el2.getAttribute("data-crown");
       captainId = (captainId === id) ? null : id;
       await persistUserDoc();
       renderMyTeam();
