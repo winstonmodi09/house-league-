@@ -187,7 +187,7 @@ import {
   onAuthStateChanged, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  getFirestore, doc, getDoc, setDoc, onSnapshot, collection,
+  getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, collection,
   query, where, updateDoc, arrayUnion, documentId, getDocs
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
@@ -243,6 +243,7 @@ function allContestants(){ return CONTESTANTS.concat(customContestants); }
 let leagues = [];        // leagues the signed-in user belongs to
 let leaderboardUsers = []; // for global leaderboard
 let adminUnlocked = false;
+let contestantsLoaded = false;
 
 function getStatus(c){ return (overrides[c.id] && overrides[c.id].status) || c.status; }
 function getPoints(c){ return (overrides[c.id] && typeof overrides[c.id].totalPoints === "number") ? overrides[c.id].totalPoints : (c.seedPoints || 0); }
@@ -261,15 +262,21 @@ function watchContestants(){
       const data = d.data();
       overrides[d.id] = data;
       if(!seedIds.has(d.id) && data.name && typeof data.price === "number"){
-        nextCustom.push({id:d.id, name:data.name, price:data.price, status:data.status||"active"});
+        nextCustom.push({id:d.id, name:data.name, price:data.price, status:data.status||"active", custom:true});
       }
     });
     customContestants = nextCustom;
+    contestantsLoaded = true;
     renderDraft(); renderMyTeam(); if(adminUnlocked) renderAdmin();
     if(uid && confirmed && computeSeasonTotal() !== lastTotal) persistUserDoc();
   });
 }
+async function deleteContestantDoc(id){
+  await deleteDoc(doc(db, "contestants", id));
+}
 async function addContestant(name, price){
+  const dupe = allContestants().find(c => c.name.trim().toLowerCase() === name.trim().toLowerCase());
+  if(dupe) throw {code:"duplicate", message:`"${name}" is already in the list.`};
   const id = "c_" + name.trim().toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/(^_|_$)/g,"") + "_" + Math.random().toString(36).slice(2,6);
   await setDoc(doc(db, "contestants", id), {name: name.trim(), price, status:"active", totalPoints:0});
 }
@@ -365,7 +372,11 @@ function watchLeaderboard(){
 
 // ============ RENDER: DRAFT ============
 function enforceCaps(){
-  squad = squad.filter(id => { const c = allContestants().find(x=>x.id===id); return c && getStatus(c)==="active"; });
+  squad = squad.filter(id => {
+    const c = allContestants().find(x=>x.id===id);
+    if(!c) return !contestantsLoaded; // don't drop a pick just because custom-contestant data hasn't loaded yet
+    return getStatus(c)==="active";
+  });
   const sCap = totalSquadCap();
   if(squad.length > sCap){ squad = squad.slice(0, sCap); }
   starting = starting.filter(id => squad.includes(id));
@@ -570,12 +581,20 @@ async function renderLeagueCards(){
       const memberData = [];
       snap.forEach(d=> memberData.push({uid:d.id, ...d.data()}));
       memberData.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0));
-      rows = memberData.map((m,i)=>`
-        <div class="lbrow ${m.uid===uid ? "you" : ""}"><span class="rank">${i+1}</span>
-          <div class="avatar" style="width:26px;height:26px;font-size:10px;">${initials(m.displayName||"Player")}</div>
-          <p class="name grow">${m.uid===uid ? "You" : (m.displayName||"Player")}</p>
-          <p style="font-weight:600;font-size:13px;margin:0;">${m.totalPoints||0}</p>
-        </div>`).join("");
+      rows = memberData.map((m,i)=>{
+        const cap = m.captainId ? allContestants().find(x=>x.id===m.captainId) : null;
+        const squadSize = (m.squad||[]).length;
+        return `
+        <div class="lbrow ${m.uid===uid ? "you" : ""}" style="flex-direction:column;align-items:stretch;padding:8px 4px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span class="rank">${i+1}</span>
+            <div class="avatar" style="width:26px;height:26px;font-size:10px;">${initials(m.displayName||"Player")}</div>
+            <p class="name grow">${m.uid===uid ? "You" : (m.displayName||"Player")}</p>
+            <p style="font-weight:600;font-size:13px;margin:0;">${m.totalPoints||0} pts</p>
+          </div>
+          <p class="meta" style="margin:2px 0 0 42px;">${squadSize ? squadSize + "-player squad" : "No squad yet"}${cap ? " &middot; Captain: " + cap.name : ""}</p>
+        </div>`;
+      }).join("");
     }
     const shareUrl = "https://wa.me/?text=" + encodeURIComponent(`Join my Bigg Boss fantasy league "${lg.name}" — code: ${lg.code}`);
     return `
@@ -603,6 +622,7 @@ function renderAdmin(){
     const quickBtns = QUICK_EVENTS.map(ev=>
       `<button data-quick="${c.id}:${ev.val}" style="font-size:11px;padding:5px 8px;">${ev.label}</button>`
     ).join("");
+    const removeBtn = c.custom ? `<button data-remove="${c.id}" style="font-size:11px;padding:5px 8px;color:var(--accent);">Remove</button>` : "";
     return `
       <div class="card" style="flex-direction:column;align-items:stretch;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -612,6 +632,7 @@ function renderAdmin(){
           </div>
           <button data-evict="${c.id}">${st==="active" ? "Mark evicted" : "Reinstate"}</button>
         </div>
+        ${removeBtn ? `<div style="margin-bottom:6px;">${removeBtn}</div>` : ""}
         <div style="display:flex;gap:6px;margin-bottom:6px;">
           <input class="inp" type="number" data-setval="${c.id}" placeholder="Set exact points" value="${pts}" style="flex:1;">
           <button data-setbtn="${c.id}">Set</button>
@@ -671,6 +692,13 @@ function renderAdmin(){
       const c = allContestants().find(x=>x.id===id);
       const current = getPoints(c);
       await setContestantOverride(id, {totalPoints: current + parseInt(val, 10)});
+    });
+  });
+  el.querySelectorAll("[data-remove]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const id = btn.getAttribute("data-remove");
+      if(!confirm("Remove this contestant? This can't be undone.")) return;
+      await deleteContestantDoc(id);
     });
   });
   el.querySelectorAll("[data-setbtn]").forEach(btn=>{
@@ -778,7 +806,6 @@ async function boot(){
       watchContestants();
       watchLeaderboard();
       watchLeagues();
-      renderDraft(); renderMyTeam();
     } else {
       uid = null;
       document.getElementById("profileModal").style.display = "none";
