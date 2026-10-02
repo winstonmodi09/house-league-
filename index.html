@@ -127,7 +127,9 @@ button:active{transform:scale(0.97);}
   </div>
 
   <div class="panel" id="panel-board">
+    <div id="overallSubtabs" class="tabs" style="margin-bottom:12px;"></div>
     <div id="leaderboardView"></div>
+    <div id="leagueStandingsView" style="display:none;"></div>
   </div>
 
   <div class="panel" id="panel-leagues">
@@ -290,6 +292,7 @@ function watchConfig(){
   onSnapshot(doc(db,"config","current"), s=>{
     const d = s.exists() ? s.data() : {};
     deadlineMs = d.deadlineMs || null; gwNum = d.gameweek || 1;
+    syncTransferWindow();
     renderDeadline(); renderDraft(); renderMyTeam(); if(adminUnlocked) renderAdmin();
   });
 }
@@ -321,22 +324,34 @@ async function loadUserDoc(){
   if(snap.exists()){
     const d = snap.data();
     squad = d.squad || []; starting = d.starting || []; captainId = d.captainId || null; confirmed = d.confirmed || false; displayName = d.displayName || "";
+    everConfirmed = d.everConfirmed || false; transfersUsedThisGW = d.transfersUsedThisGW || 0;
+    lastGwSeenForTransfers = d.lastGwSeenForTransfers || 0; transferPenalty = d.transferPenalty || 0;
   }
 }
 async function persistUserDoc(){
   const emailName = auth.currentUser && auth.currentUser.email ? auth.currentUser.email.split("@")[0] : "Player";
   await setDoc(doc(db, "users", uid), {
     squad, starting, captainId, confirmed,
+    everConfirmed, transfersUsedThisGW, lastGwSeenForTransfers, transferPenalty,
     totalPoints: (lastTotal = computeSeasonTotal()),
     displayName: displayName || emailName
   }, {merge:true});
 }
 function computeSeasonTotal(){
-  return squad.filter(id=>starting.includes(id)).reduce((s,id)=>{
+  const raw = squad.filter(id=>starting.includes(id)).reduce((s,id)=>{
     const c = allContestants().find(x=>x.id===id);
     return s + getPoints(c) * (captainId===id ? 2 : 1);
   }, 0);
+  return raw - transferPenalty;
 }
+function syncTransferWindow(){
+  if(gwNum !== lastGwSeenForTransfers){
+    lastGwSeenForTransfers = gwNum;
+    transfersUsedThisGW = 0;
+    if(uid) persistUserDoc();
+  }
+}
+function freeTransfersLeft(){ return Math.max(0, 1 - transfersUsedThisGW); }
 
 // ============ FIRESTORE: LEAGUES ============
 function genCode(){ return Math.random().toString(36).slice(2, 8).toUpperCase(); }
@@ -345,7 +360,8 @@ function watchLeagues(){
   onSnapshot(q, (snap)=>{
     leagues = [];
     snap.forEach(d=> leagues.push({id:d.id, ...d.data()}));
-    renderLeagues();
+    renderOverallSubtabs();
+    if(document.getElementById("panel-leagues").classList.contains("active")) renderLeagues();
   });
 }
 async function createLeague(name){
@@ -416,7 +432,7 @@ function renderDraft(){
   if(confirmed){
     confirmBtn.textContent = "Edit squad";
     confirmBtn.disabled = locked();
-    hint.textContent = locked() ? `Locked for Gameweek ${gwNum} — editing opens again after the next deadline.` : "Squad confirmed. Set your starting line-up in My team.";
+    hint.textContent = locked() ? `Locked for Gameweek ${gwNum} — editing opens again after the next deadline.` : (everConfirmed ? (freeTransfersLeft() > 0 ? `${freeTransfersLeft()} free transfer left this gameweek. Extra transfers cost −4 points.` : `No free transfers left this gameweek — removing an active pick now costs −4 points.`) : "Squad confirmed. Set your starting line-up in My team.");
   } else {
     confirmBtn.textContent = "Confirm squad";
     confirmBtn.disabled = squad.length !== cap || locked();
@@ -425,6 +441,7 @@ function renderDraft(){
   confirmBtn.onclick = async () => {
     if(locked()) return;
     confirmed = !confirmed;
+    if(confirmed) everConfirmed = true;
     await persistUserDoc();
     renderDraft(); renderMyTeam();
   };
@@ -434,9 +451,14 @@ function renderDraft(){
       const id = btn.getAttribute("data-toggle");
       const c = allContestants().find(x=>x.id===id);
       if(squad.includes(id)){
+        const wasVoluntaryTransfer = everConfirmed && getStatus(c)==="active";
         squad = squad.filter(s=>s!==id);
         starting = starting.filter(s=>s!==id);
         if(captainId === id) captainId = null;
+        if(wasVoluntaryTransfer){
+          transfersUsedThisGW += 1;
+          if(transfersUsedThisGW > 1) transferPenalty += 4;
+        }
       } else {
         if(squad.length >= cap){ return; }
         if(creditsUsed() + c.price > BUDGET){ return; }
@@ -554,6 +576,60 @@ function renderLeaderboard(){
 }
 
 // ============ RENDER: LEAGUES ============
+async function fetchLeagueStandings(lg){
+  const members = (lg.members||[]).slice(0, 30);
+  let memberData = [];
+  if(members.length){
+    const q = query(collection(db,"users"), where(documentId(), "in", members));
+    const snap = await getDocs(q);
+    snap.forEach(d=> memberData.push({uid:d.id, ...d.data()}));
+    memberData.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0));
+  }
+  return memberData;
+}
+function renderStandingsRows(memberData){
+  if(!memberData.length) return '<p class="sub">No ranked teams yet.</p>';
+  return memberData.map((m,i)=>{
+    const cap = m.captainId ? allContestants().find(x=>x.id===m.captainId) : null;
+    const squadSize = (m.squad||[]).length;
+    return `
+    <div class="lbrow ${m.uid===uid ? "you" : ""}" style="flex-direction:column;align-items:stretch;padding:8px 4px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="rank">${i+1}</span>
+        <div class="avatar" style="width:26px;height:26px;font-size:10px;">${initials(m.displayName||"Player")}</div>
+        <p class="name grow">${m.uid===uid ? "You" : (m.displayName||"Player")}</p>
+        <p style="font-weight:600;font-size:13px;margin:0;">${m.totalPoints||0} pts</p>
+      </div>
+      <p class="meta" style="margin:2px 0 0 42px;">${squadSize ? squadSize + "-player squad" : "No squad yet"}${cap ? " &middot; Captain: " + cap.name : ""}</p>
+    </div>`;
+  }).join("");
+}
+
+function renderOverallSubtabs(){
+  const bar = document.getElementById("overallSubtabs");
+  if(!bar) return;
+  const tabs = [{key:"global", label:"Global"}].concat(leagues.map(lg=>({key:lg.id, label:lg.name})));
+  bar.innerHTML = tabs.map((t,i)=>`<div class="tab ${i===0?"active":""}" data-ovsub="${t.key}">${t.label}</div>`).join("");
+  bar.querySelectorAll("[data-ovsub]").forEach(el=>{
+    el.addEventListener("click", async ()=>{
+      bar.querySelectorAll("[data-ovsub]").forEach(x=>x.classList.remove("active"));
+      el.classList.add("active");
+      const key = el.getAttribute("data-ovsub");
+      const lbView = document.getElementById("leaderboardView");
+      const lsView = document.getElementById("leagueStandingsView");
+      if(key === "global"){
+        lbView.style.display = ""; lsView.style.display = "none";
+      } else {
+        lbView.style.display = "none"; lsView.style.display = "";
+        lsView.innerHTML = `<p class="sub" style="text-align:center;">Loading…</p>`;
+        const lg = leagues.find(l=>l.id===key);
+        const memberData = lg ? await fetchLeagueStandings(lg) : [];
+        lsView.innerHTML = `<div class="card" style="flex-direction:column;align-items:stretch;">${renderStandingsRows(memberData)}</div>`;
+      }
+    });
+  });
+}
+
 function renderLeagues(){
   const el = document.getElementById("leaguesView");
   const formHtml = `
@@ -568,7 +644,7 @@ function renderLeagues(){
       <button class="btn-primary" id="joinLeagueBtn" style="margin-top:0;">Join league</button>
       <p class="note" id="joinLeagueHint"></p>
     </div>
-    <div id="leagueCards"><p class="sub" style="text-align:center;">Loading your leagues…</p></div>
+    <div id="leagueBasicCards"></div>
   `;
   el.innerHTML = formHtml;
 
@@ -586,55 +662,22 @@ function renderLeagues(){
     document.getElementById("joinLeagueHint").textContent = ok ? "" : "No league found with that code.";
   });
 
-  renderLeagueCards();
-}
-
-async function renderLeagueCards(){
-  const container = document.getElementById("leagueCards");
-  if(!container) return;
+  const cardsEl = document.getElementById("leagueBasicCards");
   if(leagues.length === 0){
-    container.innerHTML = `<p class="sub" style="text-align:center;">You haven't joined a league yet.</p>`;
-    return;
-  }
-  const cardsHtml = await Promise.all(leagues.map(async (lg)=>{
-    const members = (lg.members||[]).slice(0, 30);
-    let rows = "";
-    if(members.length){
-      const q = query(collection(db,"users"), where(documentId(), "in", members));
-      const snap = await getDocs(q);
-      const memberData = [];
-      snap.forEach(d=> memberData.push({uid:d.id, ...d.data()}));
-      memberData.sort((a,b)=>(b.totalPoints||0)-(a.totalPoints||0));
-      rows = memberData.map((m,i)=>{
-        const cap = m.captainId ? allContestants().find(x=>x.id===m.captainId) : null;
-        const squadSize = (m.squad||[]).length;
-        return `
-        <div class="lbrow ${m.uid===uid ? "you" : ""}" style="flex-direction:column;align-items:stretch;padding:8px 4px;">
-          <div style="display:flex;align-items:center;gap:10px;">
-            <span class="rank">${i+1}</span>
-            <div class="avatar" style="width:26px;height:26px;font-size:10px;">${initials(m.displayName||"Player")}</div>
-            <p class="name grow">${m.uid===uid ? "You" : (m.displayName||"Player")}</p>
-            <p style="font-weight:600;font-size:13px;margin:0;">${m.totalPoints||0} pts</p>
-          </div>
-          <p class="meta" style="margin:2px 0 0 42px;">${squadSize ? squadSize + "-player squad" : "No squad yet"}${cap ? " &middot; Captain: " + cap.name : ""}</p>
-        </div>`;
-      }).join("");
-    }
-    const shareUrl = "https://wa.me/?text=" + encodeURIComponent(`Join my Bigg Boss fantasy league "${lg.name}" — code: ${lg.code}`);
-    return `
-      <div class="card" style="flex-direction:column;align-items:stretch;">
+    cardsEl.innerHTML = `<p class="sub" style="text-align:center;">You haven't joined a league yet.</p>`;
+  } else {
+    cardsEl.innerHTML = leagues.map(lg=>{
+      const shareUrl = "https://wa.me/?text=" + encodeURIComponent(`Join my Bigg Boss fantasy league "${lg.name}" — code: ${lg.code}`);
+      return `<div class="card" style="flex-direction:column;align-items:stretch;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <p class="name">${lg.name}</p>
-          <span class="meta">Code: ${lg.code}</span>
+          <p class="name">${lg.name}</p><span class="meta">Code: ${lg.code}</span>
         </div>
-        ${rows || '<p class="sub">No ranked teams yet.</p>'}
-        <a href="${shareUrl}" style="text-decoration:none;">
-          <button style="width:100%;margin-top:8px;">Share invite on WhatsApp</button>
-        </a>
-      </div>
-    `;
-  }));
-  container.innerHTML = cardsHtml.join("");
+        <p class="meta">${(lg.members||[]).length} member${(lg.members||[]).length===1?"":"s"} &middot; see standings under Overall</p>
+        <a href="${shareUrl}" style="text-decoration:none;"><button style="width:100%;margin-top:8px;">Share invite on WhatsApp</button></a>
+      </div>`;
+    }).join("");
+  }
+  renderOverallSubtabs();
 }
 
 // ============ RENDER: ADMIN ============
@@ -756,6 +799,7 @@ document.querySelectorAll(".tab[data-tab]").forEach(tab=>{
     tab.classList.add("active");
     document.getElementById("panel-" + tab.getAttribute("data-tab")).classList.add("active");
     if(tab.getAttribute("data-tab") === "leagues") renderLeagues();
+    if(tab.getAttribute("data-tab") === "board") renderOverallSubtabs();
   });
 });
 
