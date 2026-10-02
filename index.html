@@ -239,6 +239,7 @@ const QUICK_EVENTS = [
 
 let squad = [], starting = [], captainId = null, confirmed = false;
 let displayName = "", deadlineMs = null, gwNum = 1, lastTotal = -1;
+let everConfirmed = false, transfersUsedThisGW = 0, lastGwSeenForTransfers = 0, transferPenalty = 0;
 let overrides = {};      // { contestantId: { status, totalPoints } }, mirrors Firestore contestants/{id}
 let customContestants = []; // contestants added via Admin, not in the hardcoded seed list
 function allContestants(){ return CONTESTANTS.concat(customContestants); }
