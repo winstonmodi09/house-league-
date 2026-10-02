@@ -88,6 +88,9 @@ button:active{transform:scale(0.97);}
       <span id="authToggleText">New here?</span>
       <a href="#" id="authToggleLink" style="color:var(--accent);text-decoration:none;font-weight:600;">Sign up</a>
     </p>
+    <p class="sub" style="text-align:center;margin-top:-4px;" id="forgotPasswordWrap">
+      <a href="#" id="forgotPasswordLink" style="color:var(--text2);text-decoration:underline;">Forgot password?</a>
+    </p>
   </div>
 </div>
 
@@ -186,7 +189,8 @@ const FIREBASE_CONFIG = {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
-  onAuthStateChanged, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider
+  onAuthStateChanged, signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider,
+  sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
   getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, collection,
@@ -824,6 +828,7 @@ function setAuthMode(signup){
   document.getElementById("authToggleText").textContent = signup ? "Already have an account?" : "New here?";
   document.getElementById("authToggleLink").textContent = signup ? "Log in" : "Sign up";
   document.getElementById("authError").textContent = "";
+  document.getElementById("forgotPasswordWrap").style.display = signup ? "none" : "block";
 }
 
 document.getElementById("authToggleLink").addEventListener("click", (e)=>{
@@ -861,6 +866,29 @@ document.getElementById("authSubmitBtn").addEventListener("click", async ()=>{
 
 document.getElementById("logoutBtn").addEventListener("click", async ()=>{
   await signOut(auth);
+});
+
+document.getElementById("forgotPasswordLink").addEventListener("click", async (e)=>{
+  e.preventDefault();
+  const errorEl = document.getElementById("authError");
+  const email = document.getElementById("authEmail").value.trim();
+  if(!email){
+    errorEl.style.color = "var(--accent)";
+    errorEl.textContent = "Type your email above first, then tap \"Forgot password?\" again.";
+    return;
+  }
+  try{
+    await sendPasswordResetEmail(auth, email);
+    errorEl.style.color = "#2f6b3a";
+    errorEl.textContent = `Password reset email sent to ${email}. Check your inbox (and spam folder).`;
+  }catch(e){
+    errorEl.style.color = "var(--accent)";
+    const messages = {
+      "auth/invalid-email": "That doesn't look like a valid email address.",
+      "auth/user-not-found": "No account found with that email."
+    };
+    errorEl.textContent = messages[e.code] || ("Couldn't send reset email: " + e.code);
+  }
 });
 
 async function boot(){
