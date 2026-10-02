@@ -204,7 +204,7 @@ const CONTESTANTS = [
   {id:"eldho_george", name:"Eldho George", price:9.0, status:"active", seedPoints:30},
   {id:"jaseela_parveen", name:"Jaseela Parveen", price:8.5, status:"active", seedPoints:30},
   {id:"rahul_easwar", name:"Rahul Easwar", price:8.5, status:"active", seedPoints:15},
-  {id:"sreeraj_ks", name:"Sreeraj K. S.", price:7.5, status:"active", seedPoints:15},
+  {id:"sreeraj_ks", name:"Sreeraj K.S. (Komban)", price:7.5, status:"active", seedPoints:15},
   {id:"mridula_vijai", name:"Mridula Vijai", price:7.5, status:"active", seedPoints:15},
   {id:"sreelakshmi_arakkal", name:"Sreelakshmi Arakkal", price:7.0, status:"active", seedPoints:15},
   {id:"rakesh_jacob", name:"Rakesh Jacob", price:7.0, status:"active", seedPoints:15},
@@ -622,9 +622,14 @@ function renderOverallSubtabs(){
       } else {
         lbView.style.display = "none"; lsView.style.display = "";
         lsView.innerHTML = `<p class="sub" style="text-align:center;">Loading…</p>`;
-        const lg = leagues.find(l=>l.id===key);
-        const memberData = lg ? await fetchLeagueStandings(lg) : [];
-        lsView.innerHTML = `<div class="card" style="flex-direction:column;align-items:stretch;">${renderStandingsRows(memberData)}</div>`;
+        try{
+          const lg = leagues.find(l=>l.id===key);
+          const memberData = lg ? await fetchLeagueStandings(lg) : [];
+          lsView.innerHTML = `<div class="card" style="flex-direction:column;align-items:stretch;">${renderStandingsRows(memberData)}</div>`;
+        }catch(e){
+          console.error("League standings failed", e);
+          lsView.innerHTML = `<p class="sub" style="text-align:center;">Couldn't load standings: ${e.message||e.code||e}</p>`;
+        }
       }
     });
   });
@@ -868,12 +873,17 @@ async function boot(){
       document.getElementById("authGate").style.display = "none";
       document.getElementById("mainApp").style.display = "block";
       showBootMessage("Loading…");
-      await loadUserDoc();
-      if(!loadUserDoc.found) await persistUserDoc();
-      watchConfig(); applyAdminPath(); renderProfile();
-      watchContestants();
-      watchLeaderboard();
-      watchLeagues();
+      try{
+        await loadUserDoc();
+        if(!loadUserDoc.found) await persistUserDoc();
+        watchConfig(); applyAdminPath(); renderProfile();
+        watchContestants();
+        watchLeaderboard();
+        watchLeagues();
+      }catch(e){
+        console.error("Post-login setup failed", e);
+        showBootMessage("Something went wrong loading your data: " + (e.message || e.code || e) + ". Please screenshot this and tell the developer.");
+      }
     } else {
       uid = null;
       document.getElementById("profileModal").style.display = "none";
