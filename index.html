@@ -143,7 +143,7 @@ button:active{transform:scale(0.97);}
     <div class="card rc"><p class="name">How to play</p><p class="meta">Pick housemates within your 100 credits (bigger names cost more), confirm your squad, then choose your starting players and a captain in My team. After each episode your players earn or lose points for what happens in the house.</p></div>
     <div class="card rc"><p class="name">Squad, starters and bench</p><p class="meta">You pick up to 15 housemates. 11 start and score points; the rest sit on the bench and score nothing. Nothing swaps automatically, you decide. As housemates get evicted your squad shrinks to match: the bench goes first, then the starters, down to a minimum of 5.</p></div>
     <div class="card rc"><p class="name">Captain</p><p class="meta">Your captain must be one of your starters. Their points count double.</p></div>
-    <div class="card rc"><p class="name">Points</p><p class="meta">Survives the week +5<br>Wins a task +10<br>House captain +15<br>Housemate of the week +20<br>Warning from Bigg Boss &minus;5<br>Rule violation &minus;10<br>Evicted &minus;20</p></div>
+    <div class="card rc"><p class="name">Points</p><p class="meta">Survives the week +5<br>Wins a task +10<br>House captain +15<br>Housemate of the week +20<br>Warning from Bigg Boss &minus;5<br>Prisoner of the week &minus;10<br>Rule violation &minus;10<br>Evicted &minus;20</p></div>
     <div class="card rc"><p class="name">Evictions</p><p class="meta">If one of your housemates is evicted they leave your squad. Tap Edit squad on the Draft tab to pick a replacement.</p></div>
     <div class="card rc"><p class="name">Deadline</p><p class="meta">Each gameweek has a deadline shown at the top of the Draft tab. After it passes, your team is locked until the next one.</p></div>
     <div class="card rc"><p class="name">Fair play</p><p class="meta">Free to play, no money or prizes. An unofficial fan game, not affiliated with Banijay, Asianet or JioHotstar. Points are added by hand after each episode, so they can take a little while to show up.</p></div>
@@ -237,6 +237,7 @@ const QUICK_EVENTS = [
   {label:"House captain (+15)", val:15},
   {label:"Housemate of week (+20)", val:20},
   {label:"Warning (-5)", val:-5},
+  {label:"Prisoner of the week (-10)", val:-10},
   {label:"Rule violation (-10)", val:-10},
   {label:"Evicted (-20)", val:-20}
 ];
