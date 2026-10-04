@@ -245,7 +245,7 @@ const QUICK_EVENTS = [
 
 let squad = [], starting = [], captainId = null, confirmed = false;
 let displayName = "", deadlineMs = null, gwNum = 1, lastTotal = -1;
-let everConfirmed = false, transfersUsedThisGW = 0, lastGwSeenForTransfers = 0, transferPenalty = 0, pointsAtGwStart = 0;
+let everConfirmed = false, transfersUsedThisGW = 0, lastGwSeenForTransfers = 0, transferPenalty = 0;
 let overrides = {};      // { contestantId: { status, totalPoints } }, mirrors Firestore contestants/{id}
 let customContestants = []; // contestants added via Admin, not in the hardcoded seed list
 function allContestants(){ return CONTESTANTS.concat(customContestants); }
@@ -335,14 +335,13 @@ async function loadUserDoc(){
     squad = d.squad || []; starting = d.starting || []; captainId = d.captainId || null; confirmed = d.confirmed || false; displayName = d.displayName || "";
     everConfirmed = d.everConfirmed || false; transfersUsedThisGW = d.transfersUsedThisGW || 0;
     lastGwSeenForTransfers = d.lastGwSeenForTransfers || 0; transferPenalty = d.transferPenalty || 0;
-    pointsAtGwStart = d.pointsAtGwStart || 0;
   }
 }
 async function persistUserDoc(){
   const emailName = auth.currentUser && auth.currentUser.email ? auth.currentUser.email.split("@")[0] : "Player";
   await setDoc(doc(db, "users", uid), {
     squad, starting, captainId, confirmed,
-    everConfirmed, transfersUsedThisGW, lastGwSeenForTransfers, transferPenalty, pointsAtGwStart,
+    everConfirmed, transfersUsedThisGW, lastGwSeenForTransfers, transferPenalty,
     totalPoints: (lastTotal = computeSeasonTotal()),
     displayName: displayName || emailName
   }, {merge:true});
@@ -358,7 +357,6 @@ function syncTransferWindow(){
   if(gwNum !== lastGwSeenForTransfers){
     lastGwSeenForTransfers = gwNum;
     transfersUsedThisGW = 0;
-    pointsAtGwStart = computeSeasonTotal();
     if(uid) persistUserDoc();
   }
 }
@@ -599,37 +597,18 @@ async function fetchLeagueStandings(lg){
   }
   return memberData;
 }
-function renderLeagueStandingsView(container, memberData, mode){
-  container.innerHTML = `
-    <div class="tabs" style="margin-bottom:10px;">
-      <div class="tab ${mode==="gw"?"active":""}" data-standmode="gw">GW score</div>
-      <div class="tab ${mode==="total"?"active":""}" data-standmode="total">Total score</div>
-    </div>
-    <div class="card" style="flex-direction:column;align-items:stretch;">${renderStandingsRows(memberData, mode)}</div>
-  `;
-  container.querySelectorAll("[data-standmode]").forEach(t=>{
-    t.addEventListener("click", ()=>renderLeagueStandingsView(container, memberData, t.getAttribute("data-standmode")));
-  });
-}
-function renderStandingsRows(memberData, mode){
+function renderStandingsRows(memberData){
   if(!memberData.length) return '<p class="sub">No ranked teams yet.</p>';
-  const withScore = memberData.map(m => ({
-    ...m,
-    gwScore: (m.totalPoints||0) - (m.pointsAtGwStart||0)
-  }));
-  const sortKey = mode === "gw" ? "gwScore" : "totalPoints";
-  withScore.sort((a,b)=>(b[sortKey]||0)-(a[sortKey]||0));
-  return withScore.map((m,i)=>{
+  return memberData.map((m,i)=>{
     const cap = m.captainId ? allContestants().find(x=>x.id===m.captainId) : null;
     const squadSize = (m.squad||[]).length;
-    const shown = mode === "gw" ? m.gwScore : (m.totalPoints||0);
     return `
     <div class="lbrow ${m.uid===uid ? "you" : ""}" style="flex-direction:column;align-items:stretch;padding:8px 4px;">
       <div style="display:flex;align-items:center;gap:10px;">
         <span class="rank">${i+1}</span>
         <div class="avatar" style="width:26px;height:26px;font-size:10px;">${initials(m.displayName||"Player")}</div>
         <p class="name grow">${m.uid===uid ? "You" : (m.displayName||"Player")}</p>
-        <p style="font-weight:600;font-size:13px;margin:0;">${shown} pts</p>
+        <p style="font-weight:600;font-size:13px;margin:0;">${m.totalPoints||0} pts</p>
       </div>
       <p class="meta" style="margin:2px 0 0 42px;">${squadSize ? squadSize + "-player squad" : "No squad yet"}${cap ? " &middot; Captain: " + cap.name : ""}</p>
     </div>`;
@@ -656,7 +635,7 @@ function renderOverallSubtabs(){
         try{
           const lg = leagues.find(l=>l.id===key);
           const memberData = lg ? await fetchLeagueStandings(lg) : [];
-          renderLeagueStandingsView(lsView, memberData, "gw");
+          lsView.innerHTML = `<div class="card" style="flex-direction:column;align-items:stretch;">${renderStandingsRows(memberData)}</div>`;
         }catch(e){
           console.error("League standings failed", e);
           lsView.innerHTML = `<p class="sub" style="text-align:center;">Couldn't load standings: ${e.message||e.code||e}</p>`;
