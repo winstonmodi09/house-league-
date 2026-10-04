@@ -569,7 +569,22 @@ function renderMyTeam(){
 // ============ RENDER: LEADERBOARD ============
 function renderLeaderboard(){
   const el = document.getElementById("leaderboardView");
-  renderLeagueStandingsView(el, leaderboardUsers, "gw");
+  const top = leaderboardUsers.slice(0, 10);
+  const myIndex = leaderboardUsers.findIndex(u=>u.uid===uid);
+  const rows = top.map((u,i)=>`
+    <div class="lbrow ${u.uid===uid ? "you" : ""}"><span class="rank">${i+1}</span>
+      <div class="avatar" style="width:28px;height:28px;font-size:11px;">${initials(u.displayName||"You")}</div>
+      <p class="name grow">${u.uid===uid ? "You" : (u.displayName||"Player")}</p><p style="font-weight:600;font-size:14px;margin:0;">${u.totalPoints||0}</p>
+    </div>`).join("");
+  let youRow = "";
+  if(myIndex >= 10){
+    const me = leaderboardUsers[myIndex];
+    youRow = `<div class="lbrow you"><span class="rank">${myIndex+1}</span>
+      <div class="avatar" style="width:28px;height:28px;font-size:11px;">YO</div>
+      <p class="name grow">You</p><p style="font-weight:600;font-size:14px;margin:0;">${me.totalPoints||0}</p>
+    </div>`;
+  }
+  el.innerHTML = `<div class="card" style="flex-direction:column;align-items:stretch;">${rows || '<p class="sub">No players yet — be the first!</p>'}${youRow}</div>`;
 }
 
 // ============ RENDER: LEAGUES ============
