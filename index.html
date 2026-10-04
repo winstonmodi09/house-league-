@@ -144,7 +144,8 @@ button:active{transform:scale(0.97);}
     <div class="card rc"><p class="name">Squad, starters and bench</p><p class="meta">You pick up to 15 housemates. 11 start and score points; the rest sit on the bench and score nothing. Nothing swaps automatically, you decide. As housemates get evicted your squad shrinks to match: the bench goes first, then the starters, down to a minimum of 5.</p></div>
     <div class="card rc"><p class="name">Captain</p><p class="meta">Your captain must be one of your starters. Their points count double.</p></div>
     <div class="card rc"><p class="name">Points</p><p class="meta">Survives the week +5<br>Wins a task +10<br>House captain +15<br>Housemate of the week +20<br>Warning from Bigg Boss &minus;5<br>Prisoner of the week &minus;10<br>Rule violation &minus;10<br>Evicted &minus;20</p></div>
-    <div class="card rc"><p class="name">Evictions</p><p class="meta">If one of your housemates is evicted they leave your squad. Tap Edit squad on the Draft tab to pick a replacement.</p></div>
+    <div class="card rc"><p class="name">Evictions</p><p class="meta">If one of your housemates is evicted they leave your squad for good. Tap Edit squad on the Draft tab to pick a free replacement.</p></div>
+    <div class="card rc"><p class="name">Secret room</p><p class="meta">A housemate sent to a secret room is out of the main house but not actually eliminated — they stay in your squad (just not scoring) until they return or are properly evicted.</p></div>
     <div class="card rc"><p class="name">Deadline</p><p class="meta">Each gameweek has a deadline shown at the top of the Draft tab. After it passes, your team is locked until the next one.</p></div>
     <div class="card rc"><p class="name">Fair play</p><p class="meta">Free to play, no money or prizes. An unofficial fan game, not affiliated with Banijay, Asianet or JioHotstar. Points are added by hand after each episode, so they can take a little while to show up.</p></div>
   </div>
@@ -256,6 +257,7 @@ let contestantsLoaded = false;
 function getStatus(c){ return (overrides[c.id] && overrides[c.id].status) || c.status; }
 function getPoints(c){ return (overrides[c.id] && typeof overrides[c.id].totalPoints === "number") ? overrides[c.id].totalPoints : (c.seedPoints || 0); }
 function activeN(){ return allContestants().filter(c=>getStatus(c)==="active").length; }
+function isOut(c){ return getStatus(c)==="evicted" || getStatus(c)==="secret_room"; }
 function totalSquadCap(){ return Math.min(SQUAD_MAX, activeN()); }
 function startingCap(){ return Math.min(STARTING_MAX, Math.max(STARTING_FLOOR, activeN()), totalSquadCap()); }
 function initials(n){ return n.split(" ").map(w=>w[0]).slice(0,2).join("").toUpperCase(); }
@@ -314,9 +316,10 @@ function renderDeadline(){
 }
 setInterval(renderDeadline, 30000);
 function sortedContestants(){
+  const tier = c => getStatus(c)==="evicted" ? 2 : (getStatus(c)==="secret_room" ? 1 : 0);
   return [...allContestants()].sort((a,b)=>{
-    const ea = getStatus(a)==="evicted", eb = getStatus(b)==="evicted";
-    if(ea !== eb) return ea ? 1 : -1;
+    const ta = tier(a), tb = tier(b);
+    if(ta !== tb) return ta - tb;
     const ca = !!a.custom, cb = !!b.custom;
     if(ca !== cb) return ca ? -1 : 1;
     return (getPoints(b)-getPoints(a)) || (b.price-a.price);
@@ -401,7 +404,7 @@ function enforceCaps(){
   squad = squad.filter(id => {
     const c = allContestants().find(x=>x.id===id);
     if(!c) return !contestantsLoaded; // don't drop a pick just because custom-contestant data hasn't loaded yet
-    return getStatus(c)==="active";
+    return getStatus(c) !== "evicted";
   });
   const sCap = totalSquadCap();
   if(squad.length > sCap){ squad = squad.slice(0, sCap); }
@@ -419,15 +422,16 @@ function renderDraft(){
   sortedContestants().forEach(c=>{
     const picked = squad.includes(c.id);
     const st = getStatus(c);
+    const statusLabel = st==="evicted" ? " &middot; evicted" : (st==="secret_room" ? " &middot; secret room" : "");
     const div = document.createElement("div");
-    div.className = "card" + (st==="evicted" ? " evicted" : "") + (picked ? " picked" : "");
+    div.className = "card" + (isOut(c) ? " evicted" : "") + (picked ? " picked" : "");
     div.innerHTML = `
       <div class="avatar">${initials(c.name)}</div>
       <div class="grow">
         <p class="name">${c.name}</p>
-        <p class="meta">${c.price.toFixed(1)} credits &middot; <b>${getPoints(c)} pts</b>${st==="evicted" ? " &middot; evicted" : ""}</p>
+        <p class="meta">${c.price.toFixed(1)} credits &middot; <b>${getPoints(c)} pts</b>${statusLabel}</p>
       </div>
-      <button data-toggle="${c.id}" ${(st==="evicted" || confirmed || locked()) ? "disabled" : ""}>${picked ? "Remove" : "Add"}</button>
+      <button data-toggle="${c.id}" ${(isOut(c) || confirmed || locked()) ? "disabled" : ""}>${picked ? "Remove" : "Add"}</button>
     `;
     list.appendChild(div);
   });
@@ -707,15 +711,18 @@ function renderAdmin(){
       `<button data-quick="${c.id}:${ev.val}" style="font-size:11px;padding:5px 8px;">${ev.label}</button>`
     ).join("");
     const removeBtn = c.custom ? `<button data-remove="${c.id}" style="font-size:11px;padding:5px 8px;color:var(--accent);">Remove</button>` : "";
+    const statusLabel = st==="active" ? "Active" : (st==="secret_room" ? "Secret room" : "Evicted");
+    const statusBtns = ["active","secret_room","evicted"].map(s=>{
+      const labels = {active:"Active", secret_room:"Secret room", evicted:"Evicted"};
+      return `<button data-status="${c.id}:${s}" ${st===s ? 'style="background:var(--accent);color:#fff;border-color:var(--accent);"' : ""}>${labels[s]}</button>`;
+    }).join("");
     return `
       <div class="card" style="flex-direction:column;align-items:stretch;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-          <div>
-            <p class="name">${c.name}</p>
-            <p class="meta">${st==="active" ? "Active" : "Evicted"} &middot; ${pts} pts total</p>
-          </div>
-          <button data-evict="${c.id}">${st==="active" ? "Mark evicted" : "Reinstate"}</button>
+        <div style="margin-bottom:6px;">
+          <p class="name">${c.name}</p>
+          <p class="meta">${statusLabel} &middot; ${pts} pts total</p>
         </div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">${statusBtns}</div>
         ${removeBtn ? `<div style="margin-bottom:6px;">${removeBtn}</div>` : ""}
         <div style="display:flex;gap:6px;margin-bottom:6px;">
           <input class="inp" type="number" data-setval="${c.id}" placeholder="Set exact points" value="${pts}" style="flex:1;">
@@ -762,11 +769,9 @@ function renderAdmin(){
     await setDoc(doc(db,"config","current"), {deadlineMs: v ? new Date(v).getTime() : null, gameweek: parseInt(document.getElementById("gwNumInput").value,10) || 1}, {merge:true});
   };
 
-  el.querySelectorAll("[data-evict]").forEach(btn=>{
+  el.querySelectorAll("[data-status]").forEach(btn=>{
     btn.addEventListener("click", async ()=>{
-      const id = btn.getAttribute("data-evict");
-      const c = allContestants().find(x=>x.id===id);
-      const newStatus = getStatus(c)==="active" ? "evicted" : "active";
+      const [id, newStatus] = btn.getAttribute("data-status").split(":");
       await setContestantOverride(id, {status:newStatus});
     });
   });
